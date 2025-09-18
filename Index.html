@@ -1,77 +1,248 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Jogo de Xadrez</title>
-<style>
-    /* ✅ ALTERAÇÃO 1: Cores do tabuleiro mais claras */
-    :root{
-        --bg:#2f2b2b;
-        --panel:#343233;
-        --light-square: #EADDC5; /* Um branco-creme suave */
-        --dark-square: #A8886A;  /* Um castanho mais claro e quente */
-        --accent:#cbb695;
-        --shadow: 0 10px 30px rgba(0,0,0,0.7);
-        --red-check: rgba(255,60,60,0.28);
-        --red-checkmate: rgba(140,10,10,0.7);
-        --ui-btn:#4b4a4a;
-    }
-    html,body{height:100%;margin:0;font-family: "Helvetica Neue", Arial, sans-serif;background:linear-gradient(180deg,#2b2828 0%, #2f2b2b 100%);color:#eee}
-    .wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:28px;}
-    h1{font-size:36px;margin:0;font-weight:600}
-    .status{font-size:18px;color:#ddd;margin-top:6px}
-    .board-panel{
-        padding:18px;background:linear-gradient(180deg,#262424 0,#1f1e1e 100%);border-radius:12px;box-shadow:var(--shadow);
-        display:flex;flex-direction:column;align-items:center;gap:16px;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Mario JS</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Press Start 2P', cursive; /* Fonte estilo retro */
+            color: white;
+            text-align: center;
+        }
+        canvas {
+            background-color: #63adff; /* Cor do céu do Mario */
+            border: 4px solid #000;
+            image-rendering: pixelated; /* Mantém o estilo pixel art */
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+        h1 {
+            font-size: 2.5em;
+            text-shadow: 3px 3px 0 #000;
+        }
+        p {
+            font-size: 1.2em;
+            margin-top: -10px;
+            text-shadow: 2px 2px 0 #000;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+    <h1>Super JS World</h1>
+    <p>Use as setas (← → ↑) ou A/D/W para mover e pular</p>
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <script>
+    // Todo o código do jogo está aqui dentro
+    document.addEventListener('DOMContentLoaded', () => {
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
 
-    #chessboard{ 
-        width:560px;height:560px;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);
-        border:10px solid #151515;border-radius:6px;overflow:hidden;background:#111;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.7), inset 0 0 0 6px rgba(0,0,0,0.25);
-    }
+        // --- CONSTANTES DO JOGO ---
+        const GRAVITY = 0.6;
+        const TILE_SIZE = 32;
 
-    .square{position:relative;display:flex;align-items:center;justify-content:center;font-size:34px;user-select:none;transition:background .12s, transform .08s;}
-    .square.light{background:var(--light-square);}
-    .square.dark{background:var(--dark-square);}
+        // --- ASSETS (IMAGENS EM BASE64 PARA FICAR EM UM ARQUIVO SÓ) ---
+        const assets = {
+            player: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAKRSURBVGhD7Zg/axNBFMfPgwZCEClpsFKwEKwUgpVgJWifpLDwJxCsBCuxsLEL/wMhVgq2glYKgkIKgoXY2ChYCAoWBKUgGDR4CS8C8Xh2u8ve3bbbjY/8sDu7s++b9/2+WRiGZgghZJIk2Y8k7m2S/scs4lR6e3sTms0mkUjkf+ZJkoxGo9u12+3+zWcBs16v50ql0v3Z5wAWADiJ791u93/NZwGzXq/ns9ms/c1nAbNCoTAnk8n92ecAFgA4iW9Jkmc7n5/ADhD+I/ifc8Lz/QCF4ADiH/n8P2wAcOrBYDA4Ho/v73weYFYqlRxJkuy/810AKsBmsxmMxgJIsVgsNlNTU3sBVuC+yMTEhO/v7/8LVkFvb+96d3f3L1AFbmdnh7W1tV2gCrS2tlZ7e/sWUAW6u7srfX19O6ACvb29xXw+fwdUgWVlZZWZmVm7A1QBY2NjxWQy2Q6oAm1tbVWr1W4HVIGtra2q0+l2ACrgdrudkZERtgNWgaenp+Lz+XYDVsHl5eXinE7/bQYslUqlkM/n5/N2AKhpfHx8lMvlYgE+gHg8/g0gCK+rq4Ozs7PbQhAeVlZWdHZ2doNb/ADo7u6ubGxs7AZeADo7OytFRUVDbwG4XC5ycnK6G3gBoKoBsVgMNputt4B7vb29iWq1jK/rwYmJCd/f3z/mC3ANaGlpqa2trT3kCnAJaGpqKt3d3T3iCnAJaGxsrLi5ufmIK8AlIC8vL/f39y+GCnAJiMViYzab5wpwCcjn88VisXz8+PEyUIGX/V6vF4/H4xrwUUB0dHR0eXn5IeADQLvdnh0cHPyfgf8fGH8A+vP5PFdWVv4P+N/f3wMhBEIIUf8BC9YJ7XhB9uMAAAAASUVORK5CYII=',
+            tiles: 'data:image/png;base64,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';
+        const sounds = {
+            jump: 'data:audio/wav;base64,UklGRiQSAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YRAAAAAA//8CAP8A//8A//8A/wD/AP8A/wD/AAAAAP8A/wD/AP8A/wD//v8A//8A/wAAAP8A/wAAAP8AAAD/AAAA//8A//4A//8A/wAAAP8A/wD//wD//gD/AAD/AP/+AP/+AP//AP/+//4A//8A//4AAAAA//0A//0A//oA//sA//oA//gA//kA//cA//YA//UA//QA//MA//EA//AA/+4A/+wA/+oA/+kA/+cA/+UA/+QA/+MA/+IA/+AA/+AA/+EA/+IA/+QA/+YA/+kA/+oA/+wA/+wA/+wA/+sA/+oA/+kA/+UA/+EA/+AA/+AA/+EA/+UA/+oA/+wA/+wA/+sA/+kA/+QA/+AA/+AA/+QA/+oA/+wA/+sA/+kA/+MA/+AA/+EA/+UA/+sA/+oA/+gA/+AA/+MA/+sA/+gA/+AA/+AA/+UA/+oA/+gA/+AA/+QA/+sA/+gA/+AA/+QA/+sA/+gA/+AA/+gA/+oA/+gA/+AA/+gA/+oA/+gA/+gA/+sA/+sA/+kA/+sA/+gA/+kA/+kA/+kA/+oA/+gA/+sA/+sA/+oA/+oA/+sA/+sA/+sA',
+            stomp: 'data:audio/wav;base64,UklGRmATAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YVgSAAD9AP8A/wD+AP8B/wL/Av8A/wD9APkA9gDwAOoA5wDfANcA0gDJAIwAfgBfAEwAQQAuABoAFAAOAAcAAgD9AP0A+QD1APQA7ADmAN4A1gDKAIwAggBiAEwAOwAaAAsA+gDoAMQAawArAP8A8gC+AGkA+gD8APYA7ADfAMIAbgAqAPYAqgBKAP4A8QDcAI8AUAD7AOAAcwD9AOoAigA3APkA3QBLAPoA5ABpAC8A+gDdAG4A+gDeAHgA+gDgAH4A9wDcAIQA9wDYAIwA9ADVAI4A9ADRAI8A8wDQAI8A8QDOAI4A8ADLAIwA7wDFAGUA6wC5AFEA6ACoAEAA5QCfAD4A4wCVADYAzwCGADAAywB/ACwAyAB1ACoAxwBtACgAwwBoACYAxQBjACUAxQBgACQAwwBeACMAxABbACIAwQBZAiAAwgBXAyAAwgBUAyEAwwBRAyMAxABOAyUAwgBMBCcAwABJBCoAvwBFBC0AvABBBC4AtwA6BC8AsgA1BC8ArQAwBDAAqgArBDEApwAlBDIApwAgBDIAnwAdBDMAngAZBDQAnQAVBDQAkgARBDMAlQANBCwAjwALBCoAiAAKBCYAggAFBCMAfQADBCIAdwABBCIAdQAAQh8AbgAAQh0AaAAAQhsAYgAEQhoAYgAFQhgAXwAGQhUAXQAHQhQAWAAIQhIAUwAJQhEAUQAJQhAAUAAJQg8ATQAJQg4ASwAKQgsASgAKQgkASAAKQggARgAKQgcARAAKQgYARAAKQgUARAAKQgQARQAKQggARgAJQgkASQAKQgwATAAKQg4AUAAKQhAAUgAIQhQAWwAGQhgAYQAFQhsAagACQh0AcQABQh8AfwAAQiEAhQAAQiMAjQAAQicAmgAEQikAoAAGQi0AqwAIQi8AsAAJQjIAtwALQjUAvgAMQjcAywANQjoAzQANQjwA1QAOQj4A3QAQQkEA5QARQkMA7wASQkUA/AATCQ==',
+            coin: 'data:audio/wav;base64,UklGRpgPAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YYAPAACAgICAwMDAQEBAgICAQEBAQEBAQEBAQECAgEBAQEBAQICAQEBAQEBAQICAgEBAQEBAQICAgEBAQECAgICAgICAgICAgICAgICAgECAgICAgICAgICAgICAgECAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgEBAgICAgICAgICAgICAgICAgECAgICAgICAgICAgICAgICAgICAgICAgICAgICAgECAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgECAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgECAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgECAgICAgICAgICAgICAgICAgECAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgECAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICau5+L/wK3NnQz4C2+9/E64GqgJb43sT/mquq+8SfyfTj6t/25+Xz7vjy8ez75+v/7+D37un25+/48/H25+/49fb26+zu6evo5+jm5uXi4eDf3Nrb2dfW1NbU0tHS0NDPzs/NzMzLycnJyMjHx8bFxcTDwsLCwcHBwMDAwMCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIA=',
+            break: 'data:audio/wav;base64,UklGRkgNAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQNAAAQEBANBgYGBgMDAQEAAAD/AAAAAP7+/v39/Pz8/Pz7+/v6+fn5+fX19fHx7+/t7evq6eno5+bm5OTj4uLh4N/f3t7d3dva2tbU1NDQzs7NzcvKycnGxsbFxMTDw8LCwcHBwMCAgIBAQAD//v7/AAD+AP4A/QD6APkA9QDxAO4A6gDlAN4A2gDRANEAzgDLAMgAxAC/ALwAugCtAKgApQCZAIwAfwBbAEwAQQAuABoADgD8ANwAhgA7APQAjABGAPUAhQBHAPQAggBJAPIAfQBKAOsAbQBLAOkAawBMAMoAVQBNALkAUgBOAKoATQBOAKQATgBOAJUATwBPAN8ADgDwAAwA7QAKAOIACwDbAAwA0wAMAMoACwDGAAwAwQAMALoACwCsAAsApQAKAJ0ACgCVAAkAjwAJAIQACQCAAAgAdwAHAG0ABwBnAAYAZAAFAFoABQBSAAQATAAEAEYAAwA/AAIAKQACABwAAgAVAAIAEAACAAwAAgAIAAMABQAFAAYACAALAA4AEwAZACAAKgA0AD0ARQBOAFgAYwBuAH0AiACSAJoApQCxALwAyADXAOQA8wD8AP8A//7+////AP7+/v7+/v79/Pz8/Pv7+/r6+vr5+fn5+fj49/f39/f29vb29vX19fX18/Pz8vLy8vLx8fHx8fDw8PDw8O/v7+/u7u7t7e3t7e3s7Ozs7Ozr6+vr6urq6urq6ujo6Ojn5+fn5+fn5uXl5eXl5OTk5OTk5OTi4uLi4uLi4uHh4eHh39/f39/f39/e3t7e3t7e3t7d3d3d3d3d3d3c3Nzc3Nzc3Nza2tra2tra2tra2dnZ2dnZ2dfX19fX19fX19fX1tXV1dXV1dXV1dTT09PT09PT09PT0tLS0tLS0tLS0tHR0dHR0dHR0dHR0NDQ0NDQ0NDQ0NDPz8/Pz8/Pz8/Pz87Ozc3Nzc3Nzc3Nzc3Nzc3Ny8vLy8vLy8vLy8vLycnJycnJycnJycnJyMjIyMjIyMjIyMjIx8fHx8fHx8fHx8fHxs'
+        };
 
-    /* destaque de seleção e movimentos válidos */
-    .square.selected{outline:4px solid rgba(80,160,255,0.25);box-shadow:0 0 0 4px rgba(80,160,255,0.06) inset}
-    .square.valid-move::after{
-        content:"";position:absolute;width:22px;height:22px;border-radius:50%;box-shadow:0 0 0 4px rgba(0,0,0,0.12) inset;opacity:0.9;
-        display:block;
-        border:3px solid rgba(255,255,255,0.15);
-    }
-    .square .piece{cursor:grab;display:inline-block;line-height:1;transform:translateY(2px)}
-    .piece.dragging{opacity:0.6;cursor:grabbing}
+        let playerImg = new Image();
+        playerImg.src = assets.player;
+        let tilesImg = new Image();
+        tilesImg.src = assets.tiles;
 
-    /* Xeque e Xeque-mate */
-    .square.in-check{ box-shadow: inset 0 0 0 6px var(--red-check); transition: box-shadow .18s; }
-    .square.in-checkmate{ box-shadow: inset 0 0 0 8px var(--red-checkmate); filter:brightness(0.95); }
+        // --- VARIÁVEIS DO JOGO ---
+        let player;
+        let keys = {};
+        let level = [];
+        let enemies = [];
+        let particles = [];
+        let cameraX = 0;
+        let score = 0;
+        let coins = 0;
 
-    /* ✅ ALTERAÇÃO 2: Contorno preto para as peças brancas */
-    .white-piece{
-        color: #FFFFFF;
-        /* Adiciona um contorno preto de 1px e mantém a sombra original */
-        text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 2px rgba(0,0,0,0.5);
-        font-size:36px;
-    }
-    .black-piece{
-        color: #000000;
-        text-shadow: 0 1px 1px rgba(255,255,255,0.1);
-        font-size:36px;
-    }
+        // Nível em formato de matriz de strings
+        const levelMap = [
+            "                                                                                ",
+            "                                                                                ",
+            "                                                                                ",
+            "                                                                                ",
+            "                                 ????#???                                       ",
+            "                                                                                ",
+            "                                                                                ",
+            "                         #???#                                                  ",
+            "                                                                                ",
+            "                                       G   G                                    ",
+            "                G G                  #########                                  ",
+            "             #######                                                            ",
+            "                                                                                ",
+            "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        ];
+        
+        // --- CLASSES DO JOGO ---
+        class Player {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = TILE_SIZE;
+                this.height = TILE_SIZE;
+                this.dx = 0;
+                this.dy = 0;
+                this.grounded = false;
+                this.jumpPower = 13;
+                this.speed = 4;
+                
+                // Animação
+                this.frame = 0;
+                this.frameTimer = 0;
+                this.animationSpeed = 8; // Menor = mais rápido
+                this.direction = 1; // 1 = direita, -1 = esquerda
+            }
 
-    /* botões e modal */
-    .controls{display:flex;gap:12px;align-items:center}
-    button{background:var(--ui-btn);border:none;padding:10px 18px;border-radius:8px;color:#ddd;cursor:pointer;box-shadow:0 6px 14px rgba(0,0,0,0.45)}
-    button:hover{transform:translateY(-1px)}
-    #promotion-modal{ position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#222;padding:18px;border-radius:10px;box-shadow:0 18px 40px rgba(0,0,0,0.7); display:flex;gap:10px;z-index:40;}
-    #promotion-modal.hidden{display:none}
-    .promotion-choice{font-size:34px;padding:10px 14px;border-radius:8px;background:#2d2b2b;border:1px solid rgba(255,255,255,0.02);cursor:pointer}
-    .promotion-choice:hover{transform:translateY(-3px)}
+            jump() {
+                if (this.grounded) {
+                    this.dy = -this.jumpPower;
+                    this.grounded = false;
+                    playSound(assets.jump);
+                }
+            }
 
+            update() {
+                // Input
+                if (keys['ArrowLeft'] || keys['KeyA']) {
+                    this.dx = -this.speed;
+                    this.direction = -1;
+                } else if (keys['ArrowRight'] || keys['KeyD']) {
+                    this.dx = this.speed;
+                    this.direction = 1;
+                } else {
+                    this.dx = 0;
+                }
+
+                // Gravidade
+                this.dy += GRAVITY;
+                
+                // Colisão horizontal
+                this.x += this.dx;
+                this.handleCollision('x');
+
+                // Colisão vertical
+                this.y += this.dy;
+                this.grounded = false;
+                this.handleCollision('y');
+
+                // Animação
+                this.frameTimer++;
+                if (this.frameTimer > this.animationSpeed) {
+                    this.frameTimer = 0;
+                    if (this.dx !== 0 && this.grounded) {
+                        this.frame = (this.frame + 1) % 3; // 3 frames de corrida
+                    } else if (!this.grounded) {
+                        this.frame = 3; // Frame de pulo
+                    } else {
+                        this.frame = 0; // Frame parado
+                    }
+                }
+            }
+
+            handleCollision(axis) {
+                level.forEach(tile => {
+                    if (this.isCollidingWith(tile)) {
+                        if (axis === 'y') {
+                            if (this.dy > 0) { // Colidindo por cima
+                                this.y = tile.y - this.height;
+                                this.dy = 0;
+                                this.grounded = true;
+                            } else if (this.dy < 0) { // Colidindo por baixo
+                                this.y = tile.y + tile.height;
+                                this.dy = 0;
+                                
+                                // Interagir com o bloco
+                                if (tile.type === 'brick') {
+                                    tile.isBroken = true;
+                                    createParticles(tile.x, tile.y);
+                                    playSound(assets.break);
+                                } else if (tile.type === 'question') {
+                                    tile.type = 'empty';
+                                    createCoinParticle(tile.x, tile.y);
+                                    playSound(assets.coin);
+                                    coins++;
+                                    score += 200;
+                                }
+                            }
+                        }
+                        if (axis === 'x') {
+                            if (this.dx > 0) { // Colidindo pela direita
+                                this.x = tile.x - this.width;
+                            } else if (this.dx < 0) { // Colidindo pela esquerda
+                                this.x = tile.x + tile.width;
+                            }
+                        }
+                    }
+                });
+            }
+
+            isCollidingWith(obj) {
+                return this.x < obj.x + obj.width &&
+                       this.x + this.width > obj.x &&
+                       this.y < obj.y + obj.height &&
+                       this.y + this.height > obj.y;
+            }
+
+            draw() {
+                ctx.save();
+                let spriteX = this.frame * 16;
+                if (this.direction === -1) {
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(playerImg, spriteX, 0, 16, 16, -this.x - this.width + cameraX, this.y, this.width, this.height);
+                } else {
+                    ctx.drawImage(playerImg, spriteX, 0, 16, 16, this.x - cameraX, this.y, this.width, this.height);
+                }
+                ctx.restore();
+            }
+        }
+
+        class Enemy {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = TILE_SIZE;
+                this.height = TILE_SIZE;
+                this.dx = -1;
+                this.isDead = false;
+                this.frame = 0;
+                this.frameTimer = 0;
+            }
+
+            update() {
+                if (this.isDead) return;
+
+                this.x += this.dx;
+                
+                // IA simples: inverter direção ao colidir com blocos
+                level.forEach(tile => {
+                    if(this.x < tile.x + tile.width && this.x + this.width > tile.x) {
+                       // Verificar se está no nível do bloco e um pouco à frente
+                       if (this.y + this.height === tile.y) {
+                            if(this.dx < 0 && this.x < tile.x + tile.width) {
+                                let wallLeft = level.find(w => w.x === tile.x - TILE_SIZE && w.y === tile.y - TILE_SIZE);
+                                if(w
     /* overlay final de jogo */
     #game-over-overlay{position:fixed;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.45), rgba(0,0,0,0.7));display:flex;align-items:center;justify-content:center;z-index:60}
     #game-over-overlay.hidden{display:none}
