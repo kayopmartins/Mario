@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-t">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mario 2D JS</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#5fc0ff;font-family:sans-serif}
+#gameCanvas{display:block;margin:0 auto;background:linear-gradient(#5fc0ff,#88dfff);box-shadow:0 0 40px rgba(0,0,0,.4)}
+.hud{position:fixed;top:10px;left:50%;transform:translateX(-50%);color:white;font-size:20px;font-weight:bold;text-shadow:2px 2px 3px #000}
+.controls{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:20px}
+button{width:60px;height:60px;border-radius:50%;background:#fff3;color:#fff;border:2px solid #fff;font-size:24px}
+@media(min-width:800px){.controls{display:none}}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="960" height="540"></canvas>
+<div class="hud">Moedas: <span id="coins">0</span> | Vidas: <span id="lives">3</span></div>
+
+<div class="controls">
+  <button id="left">←</button>
+  <button id="jump">⬆️</button>
+  <button id="right">→</button>
+</div>
+
+<script>
+const canvas=document.getElementById("gameCanvas"),ctx=canvas.getContext("2d");
+let keys={left:false,right:false,up:false},touch={left:false,right:false,up:false};
+
+// --- Carregamento de Sprites (Versão Melhorada) ---
+const sprites = {};
+const spriteFiles = {
+    player: 'mario.png',
+    goomba: 'goomba.png',
+    brick: 'brick.png',
+    question: 'question-block.png',
+    ground: 'ground.png',
+    pipe: 'pipe.png',
+    coin: 'coin.png',
+    mushroom: 'mushroom.png'
+};
+
+let spritesLoaded = 0;
+let spritesFailed = 0;
+const totalSprites = Object.keys(spriteFiles).length;
+let gameStarted = false; // Garante que o jogo inicie apenas uma vez
+
+function checkLoadingComplete() {
+    // Se o jogo já começou ou se alguma imagem falhou, não faz mais nada.
+    if (gameStarted || spritesFailed > 0) {
+        if(spritesFailed > 0){
+             console.error("O jogo não pode iniciar pois uma ou mais imagens falharam ao carregar.");
+        }
+        return;
+    }
+
+    // Se todas as imagens carregaram com sucesso
+    if (spritesLoaded === totalSprites) {
+        gameStarted = true;
+        console.log("Todos os sprites carregados, iniciando o jogo!");
+        loop(); // Inicia o jogo!
+    }
+}
+
+for (const key in spriteFiles) {
+    sprites[key] = new Image();
+    // A linha abaixo é importante para evitar problemas de "cross-origin" em alguns cenários
+    sprites[key].crossOrigin = "Anonymous"; 
+    
+    sprites[key].onload = () => {
+        console.log(`'${spriteFiles[key]}' carregado com sucesso!`);
+        spritesLoaded++;
+        checkLoadingComplete();
+    };
+
+    sprites[key].onerror = () => {
+        console.error(`FALHA ao carregar: '${spriteFiles[key]}'`);
+        spritesFailed++;
+        checkLoadingComplete();
+    };
+    
+    sprites[key].src = 'sprites/' + spriteFiles[key];
+}
+
+
+// --- assets do jogo ---
+const player={x:100,y:400,w:40,h:50,vx:0,vy:0,onGround:false};
+let coins=0,lives=3;
+const gravity=0.6,speed=3,jumpPower=12;
+
+// --- Plataformas e cenário ---
+// Adicionamos um 'type' para saber qual sprite desenhar
+const platforms=[
+    {x:0, y:500, w:960, h:40, type: 'ground'}, // Chão principal
+    {x:280, y:380, w:40, h:40, type: 'brick'},
+    {x:320, y:380, w:40, h:40, type: 'question'},
+    {x:360, y:380, w:40, h:40, type: 'brick'},
+    {x:400, y:380, w:40, h:40, type: 'question'},
+    {x:360, y:220, w:40, h:40, type: 'question'}, // Bloco flutuante
+    {x:780, y:420, w:80, h:80, type: 'pipe'} // Cano
+];
+let goombas=[{x:500,y:460,w:40,h:40,vx:1}];
+let coinObjs=[{x:365,y:180,w:30,h:30},{x:405,y:340,w:30,h:30}];
+let powerUps = [{x:325, y:340, w:40, h:40, type: 'mushroom'}]; // Exemplo de cogumelo
+
+// --- Input PC ---
+document.addEventListener("keydown",e=>{
+  if(e.code==="ArrowLeft") keys.left=true;
+  if(e.code==="ArrowRight") keys.right=true;
+  if(e.code==="Space"||e.code==="ArrowUp") keys.up=true;
+});
+document.addEventListener("keyup",e=>{
+  if(e.code==="ArrowLeft") keys.left=false;
+  if(e.code==="ArrowRight") keys.right=false;
+  if(e.code==="Space"||e.code==="ArrowUp") keys.up=false;
+});
+
+// --- Input Mobile ---
+document.getElementById("left").ontouchstart=()=>touch.left=true;
+document.getElementById("left").ontouchend=()=>touch.left=false;
+document.getElementById("right").ontouchstart=()=>touch.right=true;
+document.getElementById("right").ontouchend=()=>touch.right=false;
+document.getElementById("jump").ontouchstart=()=>touch.up=true;
+document.getElementById("jump").ontouchend=()=>touch.up=false;
+
+// --- Game Loop ---
+function update(){
+  const movingLeft=keys.left||touch.left,movingRight=keys.right||touch.right;
+  if(movingLeft) player.vx=-speed; else if(movingRight) player.vx=speed; else player.vx=0;
+  if((keys.up||touch.up)&&player.onGround){player.vy=-jumpPower;player.onGround=false;}
+
+  player.vy+=gravity;
+  player.x+=player.vx; player.y+=player.vy;
+
+  player.onGround=false;
+  for(const p of platforms){
+      // Colisão simples por cima
+      if(player.x < p.x+p.w && player.x+player.w > p.x && player.y+player.h < p.y+20 && player.y+player.h+player.vy >= p.y){
+          player.y=p.y-player.h; player.vy=0; player.onGround=true;
+      }
+      // Bloqueio lateral (simples)
+      if(rectCollision(player, p) && !player.onGround) {
+          if(player.vx > 0) player.x = p.x - player.w;
+          if(player.vx < 0) player.x = p.x + p.w;
+      }
+  }
+
+  if(player.y>canvas.height){ lives--;resetPos(); }
+  if(player.x<0) player.x=0;
+
+  for(const g of goombas){
+    g.x+=g.vx;
+    if(g.x<450||g.x+g.w>750) g.vx*=-1; // Movimento limitado
+    if(rectCollision(player,g)){
+      if(player.vy>1 && (player.y + player.h) < g.y + 20){ // pulou em cima
+        g.dead=true;player.vy=-8;
+      }else{ lives--;resetPos(); }
+    }
+  }
+  goombas=goombas.filter(g=>!g.dead);
+
+  for(const c of coinObjs){
+    if(rectCollision(player,c)){
+      coins++;c.collected=true;
+    }
+  }
+  coinObjs=coinObjs.filter(c=>!c.collected);
+
+  document.getElementById("coins").innerText=coins;
+  document.getElementById("lives").innerText=lives;
+}
+
+function resetPos(){player.x=100;player.y=400;player.vx=player.vy=0;}
+
+function rectCollision(a,b){return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height); // Limpa a tela
+  ctx.fillStyle="#5fc0ff";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Desenha plataformas/cenário
+  for(const p of platforms){
+    if(p.type === 'ground') {
+        // Repete a imagem do chão para preencher a largura
+        let x = p.x;
+        while(x < p.x + p.w) {
+            ctx.drawImage(sprites.ground, x, p.y, 40, 40);
+            x += 40;
+        }
+    } else {
+        ctx.drawImage(sprites[p.type], p.x, p.y, p.w, p.h);
+    }
+  }
+
+  // Desenha o jogador
+  ctx.drawImage(sprites.player, player.x, player.y, player.w, player.h);
+
+  // Desenha os goombas
+  for(const g of goombas){
+    ctx.drawImage(sprites.goomba, g.x, g.y, g.w, g.h);
+  }
+
+  // Desenha as moedas
+  for(const c of coinObjs){
+    ctx.drawImage(sprites.coin, c.x, c.y, c.w, c.h);
+  }
+    
+  // Desenha power-ups
+  for (const p of powerUps) {
+      ctx.drawImage(sprites[p.type], p.x, p.y, p.w, p.h);
+  }
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+// Não chamamos loop() aqui diretamente, ele é chamado quando as imagens terminam de carregar.
+</script>
+</body>
+</html>
